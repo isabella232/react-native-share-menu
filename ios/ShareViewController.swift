@@ -15,6 +15,10 @@ import RNShareMenu
 class ShareViewController: SLComposeServiceViewController {
   var hostAppId: String?
   var hostAppUrlScheme: String?
+  var selectedImages: [UIImage] = []
+  var imagesData: [Data] = []
+  
+  let shareDispatchGroup = DispatchGroup()
   
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -53,7 +57,7 @@ class ShareViewController: SLComposeServiceViewController {
     }
 
   func handlePost(_ item: NSExtensionItem, extraData: [String:Any]? = nil) {
-    guard let provider = item.attachments?.first else {
+    guard let provider = item.attachments else {
       cancelRequest()
       return
     }
@@ -64,10 +68,10 @@ class ShareViewController: SLComposeServiceViewController {
       removeExtraData()
     }
 
-    if provider.isText {
-      storeText(withProvider: provider)
-    } else if provider.isURL {
-      storeUrl(withProvider: provider)
+    if provider.first!.isText {
+      storeText(withProvider: provider.first!)
+    } else if provider.first!.isURL {
+      storeUrl(withProvider: provider.first!)
     } else {
       storeFile(withProvider: provider)
     }
@@ -153,50 +157,119 @@ class ShareViewController: SLComposeServiceViewController {
     }
   }
   
-  func storeFile(withProvider provider: NSItemProvider) {
-    provider.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (data, error) in
-      guard (error == nil) else {
-        self.exit(withError: error.debugDescription)
-        return
-      }
-      guard let url = data as? URL else {
-        self.exit(withError: COULD_NOT_FIND_IMG_ERROR)
-        return
-      }
-      guard let hostAppId = self.hostAppId else {
-        self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
-        return
-      }
-      guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
-        self.exit(withError: NO_APP_GROUP_ERROR)
-        return
-      }
-      guard let groupFileManagerContainer = FileManager.default
-              .containerURL(forSecurityApplicationGroupIdentifier: "group.\(hostAppId)")
-      else {
-        self.exit(withError: NO_APP_GROUP_ERROR)
-        return
-      }
-      
-      let mimeType = url.extractMimeType()
-      let fileExtension = url.pathExtension
-      let fileName = UUID().uuidString
-      let filePath = groupFileManagerContainer
-        .appendingPathComponent("\(fileName).\(fileExtension)")
-      
-      guard self.moveFileToDisk(from: url, to: filePath) else {
-        self.exit(withError: COULD_NOT_SAVE_FILE_ERROR)
-        return
-      }
-      
-      userDefaults.set([DATA_KEY: filePath.absoluteString,  MIME_TYPE_KEY: mimeType],
+  func storeFile(withProvider provider: [NSItemProvider]) {
+    
+    guard let hostAppId = self.hostAppId else {
+      self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
+      return
+    }
+    guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
+      self.exit(withError: NO_APP_GROUP_ERROR)
+      return
+    }
+    guard let groupFileManagerContainer = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.\(hostAppId)")
+    else {
+      self.exit(withError: NO_APP_GROUP_ERROR)
+      return
+    }
+
+    var results : NSMutableArray = []
+    for item in provider {
+      self.shareDispatchGroup.enter()
+
+      item.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (data, error) in
+        guard (error == nil) else {
+          self.exit(withError: error.debugDescription)
+          return
+        }
+        guard let url = data as? URL else {
+          self.exit(withError: COULD_NOT_FIND_IMG_ERROR)
+          return
+        }
+
+        let mimeType = url.extractMimeType()
+        let fileExtension = url.pathExtension
+        let fileName = UUID().uuidString
+        let filePath = groupFileManagerContainer
+          .appendingPathComponent("\(fileName).\(fileExtension)")
+
+        guard self.moveFileToDisk(from: url, to: filePath) else {
+          self.exit(withError: COULD_NOT_SAVE_FILE_ERROR)
+          return
+        }
+
+        let dict: NSMutableDictionary = [:]
+        dict["url"] = filePath.absoluteString
+        dict["mimeType"] = mimeType
+
+        results.add(dict)
+
+        self.shareDispatchGroup.leave()
+
+      } //item-load
+    } //for loop
+
+    self.shareDispatchGroup.notify(queue: .main) {
+      let data = self.json(from: results)
+
+      userDefaults.set([DATA_KEY: data],
                        forKey: USER_DEFAULTS_KEY)
       userDefaults.synchronize()
-      
+
       self.openHostApp()
     }
+    
+//    provider.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (data, error) in
+//      guard (error == nil) else {
+//        self.exit(withError: error.debugDescription)
+//        return
+//      }
+//      guard let url = data as? URL else {
+//        self.exit(withError: COULD_NOT_FIND_IMG_ERROR)
+//        return
+//      }
+//      guard let hostAppId = self.hostAppId else {
+//        self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
+//        return
+//      }
+//      guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
+//        self.exit(withError: NO_APP_GROUP_ERROR)
+//        return
+//      }
+//      guard let groupFileManagerContainer = FileManager.default
+//              .containerURL(forSecurityApplicationGroupIdentifier: "group.\(hostAppId)")
+//      else {
+//        self.exit(withError: NO_APP_GROUP_ERROR)
+//        return
+//      }
+//
+//      let mimeType = url.extractMimeType()
+//      let fileExtension = url.pathExtension
+//      let fileName = UUID().uuidString
+//      let filePath = groupFileManagerContainer
+//        .appendingPathComponent("\(fileName).\(fileExtension)")
+//
+//      guard self.moveFileToDisk(from: url, to: filePath) else {
+//        self.exit(withError: COULD_NOT_SAVE_FILE_ERROR)
+//        return
+//      }
+//
+//      userDefaults.set([DATA_KEY: filePath.absoluteString,  MIME_TYPE_KEY: mimeType],
+//                       forKey: USER_DEFAULTS_KEY)
+//      userDefaults.synchronize()
+//
+//      self.openHostApp()
+//    }
   }
 
+  func json(from object:Any) -> String? {
+      guard let data = try? JSONSerialization.data(withJSONObject: object, options: []) else {
+          return nil
+      }
+      return String(data: data, encoding: String.Encoding.utf8)
+  }
+  
   func moveFileToDisk(from srcUrl: URL, to destUrl: URL) -> Bool {
     do {
       if FileManager.default.fileExists(atPath: destUrl.path) {

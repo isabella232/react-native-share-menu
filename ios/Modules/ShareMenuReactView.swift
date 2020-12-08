@@ -6,11 +6,22 @@
 //
 
 import MobileCoreServices
+import AVFoundation
+
+struct ShareItem {
+    let url: String?
+    let mimeType: String
+    let thumbnail: String?
+    let width: Int?
+    let height: Int?
+}
 
 @objc(ShareMenuReactView)
 public class ShareMenuReactView: NSObject {
     static var viewDelegate: ReactShareViewDelegate?
-
+    
+    let shareDispatchGroup = DispatchGroup()
+    
     @objc
     static public func requiresMainQueueSetup() -> Bool {
         return false
@@ -82,70 +93,131 @@ public class ShareMenuReactView: NSObject {
             return
         }
 
-        extractDataFromContext(context: extensionContext) { (data, mimeType, error) in
+        extractDataFromContext(context: extensionContext) { (data, error) in
             guard (error == nil) else {
                 reject("error", error?.description, nil)
                 return
             }
-
-            resolve([MIME_TYPE_KEY: mimeType, DATA_KEY: data])
+            resolve([DATA_KEY: data])
+            //resolve([MIME_TYPE_KEY: mimeType, DATA_KEY: data])
         }
     }
 
-    func extractDataFromContext(context: NSExtensionContext, withCallback callback: @escaping (String?, String?, NSException?) -> Void) {
+    func extractDataFromContext(context: NSExtensionContext, withCallback callback: @escaping (NSMutableArray, NSException?) -> Void) {
         let item:NSExtensionItem! = context.inputItems.first as? NSExtensionItem
         let attachments:[AnyObject]! = item.attachments
 
+        var results : NSMutableArray = []//[ShareItem] = [];
+        
         var urlProvider:NSItemProvider! = nil
-        var imageProvider:NSItemProvider! = nil
+        
         var textProvider:NSItemProvider! = nil
         var dataProvider:NSItemProvider! = nil
 
         for provider in attachments {
+            self.shareDispatchGroup.enter()
+            
             if provider.hasItemConformingToTypeIdentifier(kUTTypeURL as String) {
                 urlProvider = provider as? NSItemProvider
-                break
+                //break
             } else if provider.hasItemConformingToTypeIdentifier(kUTTypeText as String) {
                 textProvider = provider as? NSItemProvider
-                break
+                //break
             } else if provider.hasItemConformingToTypeIdentifier(kUTTypeImage as String) {
+                var imageProvider:NSItemProvider! = nil
                 imageProvider = provider as? NSItemProvider
-                break
+                imageProvider.loadItem(forTypeIdentifier: kUTTypeImage as String, options: nil) { (item, error) in
+                    let url: URL! = item as? URL
+                    
+                    let dict: NSMutableDictionary = [:]
+                    dict["url"] = url.absoluteString
+                    dict["mimeType"] = self.extractMimeType(from: url)
+                    dict["thumbnail"] = nil
+                    dict["Id"] = UUID().uuidString
+                    
+                    results.add(dict)
+                    self.shareDispatchGroup.leave()
+                }
+                //break
+            }  else if provider.hasItemConformingToTypeIdentifier(kUTTypeMovie as String) {
+                var videoProvider:NSItemProvider! = nil
+                videoProvider = provider as? NSItemProvider
+                videoProvider.loadItem(forTypeIdentifier: kUTTypeMovie as String, options: nil) { (item, error) in
+                    let url: URL! = item as? URL
+                    
+                    var thumbBase64: String = ""
+                    let thumbImage: UIImage? = self.thumbnailForVideo(url: url)
+                    if thumbImage != nil {
+                        let thumbImageData:NSData = thumbImage!.pngData()! as NSData
+                        thumbBase64 = thumbImageData.base64EncodedString(options: .lineLength64Characters)
+                    }
+                    
+                    let dict: NSMutableDictionary = [:]
+                    dict["url"] = url.absoluteString
+                    dict["mimeType"] = self.extractMimeType(from: url)
+                    dict["thumbnail"] = thumbBase64
+                    dict["Id"] = UUID().uuidString
+                    
+                    results.add(dict)
+                    self.shareDispatchGroup.leave()
+                }
+                //break
             } else if provider.hasItemConformingToTypeIdentifier(kUTTypeData as String) {
                 dataProvider = provider as? NSItemProvider
-                break
+                //break
             }
         }
-
-        if (urlProvider != nil) {
-            urlProvider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (item, error) in
-                let url: URL! = item as? URL
-
-                callback(url.absoluteString, "text/plain", nil)
-            }
-        } else if (imageProvider != nil) {
-            imageProvider.loadItem(forTypeIdentifier: kUTTypeImage as String, options: nil) { (item, error) in
-                let url: URL! = item as? URL
-
-                callback(url.absoluteString, self.extractMimeType(from: url), nil)
-            }
-        } else if (textProvider != nil) {
-            textProvider.loadItem(forTypeIdentifier: kUTTypeText as String, options: nil) { (item, error) in
-                let text:String! = item as? String
-
-                callback(text, "text/plain", nil)
-            }
-        }  else if (dataProvider != nil) {
-            dataProvider.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (item, error) in
-                let url: URL! = item as? URL
-
-                callback(url.absoluteString, self.extractMimeType(from: url), nil)
-            }
-        } else {
-            callback(nil, nil, NSException(name: NSExceptionName(rawValue: "Error"), reason:"couldn't find provider", userInfo:nil))
+        
+        self.shareDispatchGroup.notify(queue: .main) {
+            callback(results, nil)
         }
+
+//        if (urlProvider != nil) {
+//            urlProvider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (item, error) in
+//                let url: URL! = item as? URL
+//
+//                callback(url.absoluteString, "text/plain", nil)
+//            }
+//        } else if (imageProvider != nil) {
+//            imageProvider.loadItem(forTypeIdentifier: kUTTypeImage as String, options: nil) { (item, error) in
+//                let url: URL! = item as? URL
+//
+//                callback(url.absoluteString, self.extractMimeType(from: url), nil)
+//            }
+//        } else if (textProvider != nil) {
+//            textProvider.loadItem(forTypeIdentifier: kUTTypeText as String, options: nil) { (item, error) in
+//                let text:String! = item as? String
+//
+//                callback(text, "text/plain", nil)
+//            }
+//        }  else if (dataProvider != nil) {
+//            dataProvider.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (item, error) in
+//                let url: URL! = item as? URL
+//
+//                callback(url.absoluteString, self.extractMimeType(from: url), nil)
+//            }
+//        } else {
+//            callback(nil, nil, NSException(name: NSExceptionName(rawValue: "Error"), reason:"couldn't find provider", userInfo:nil))
+//        }
     }
 
+    func thumbnailForVideo(url: URL) -> UIImage? {
+        let asset = AVAsset(url: url)
+        let assetImageGenerator = AVAssetImageGenerator(asset: asset)
+        assetImageGenerator.appliesPreferredTrackTransform = true
+
+        var time = asset.duration
+        time.value = min(time.value, 2)
+
+        do {
+            let imageRef = try assetImageGenerator.copyCGImage(at: time, actualTime: nil)
+            return UIImage(cgImage: imageRef)
+        } catch {
+            print("failed to create thumbnail")
+            return nil
+        }
+    }
+    
     func extractMimeType(from url: URL) -> String {
       let fileExtension: CFString = url.pathExtension as CFString
       guard let extUTI = UTTypeCreatePreferredIdentifierForTag(
