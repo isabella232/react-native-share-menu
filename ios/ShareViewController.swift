@@ -18,8 +18,6 @@ class ShareViewController: SLComposeServiceViewController {
   var selectedImages: [UIImage] = []
   var imagesData: [Data] = []
   
-  let shareDispatchGroup = DispatchGroup()
-  
   override func viewDidLoad() {
     super.viewDidLoad()
     
@@ -174,10 +172,11 @@ class ShareViewController: SLComposeServiceViewController {
       return
     }
 
+    let shareDispatchGroup = DispatchGroup()
+    
     var results : NSMutableArray = []
     for item in provider {
-      self.shareDispatchGroup.enter()
-
+      shareDispatchGroup.enter()
       item.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (data, error) in
         guard (error == nil) else {
           self.exit(withError: error.debugDescription)
@@ -205,20 +204,19 @@ class ShareViewController: SLComposeServiceViewController {
 
         results.add(dict)
 
-        self.shareDispatchGroup.leave()
+        shareDispatchGroup.leave()
 
       } //item-load
     } //for loop
+    
+    shareDispatchGroup.wait()
+    let data = self.json(from: results)
 
-    self.shareDispatchGroup.notify(queue: .main) {
-      let data = self.json(from: results)
+    userDefaults.set([DATA_KEY: data],
+                     forKey: USER_DEFAULTS_KEY)
+    userDefaults.synchronize()
 
-      userDefaults.set([DATA_KEY: data],
-                       forKey: USER_DEFAULTS_KEY)
-      userDefaults.synchronize()
-
-      self.openHostApp()
-    }
+    self.openHostApp()
     
 //    provider.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (data, error) in
 //      guard (error == nil) else {
@@ -271,10 +269,19 @@ class ShareViewController: SLComposeServiceViewController {
   }
   
   func moveFileToDisk(from srcUrl: URL, to destUrl: URL) -> Bool {
+
     do {
       if FileManager.default.fileExists(atPath: destUrl.path) {
         try FileManager.default.removeItem(at: destUrl)
       }
+      let isExist =  FileManager.default.fileExists(atPath: srcUrl.path)
+      if isExist {
+        print("file found at path: \(srcUrl.path)")
+      }
+      else {
+        print("file NOT found at path: \(srcUrl.path)")
+      }
+      
       try FileManager.default.copyItem(at: srcUrl, to: destUrl)
     } catch (let error) {
       print("Could not save file from \(srcUrl) to \(destUrl): \(error)")
