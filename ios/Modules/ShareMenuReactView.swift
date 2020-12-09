@@ -8,14 +8,6 @@
 import MobileCoreServices
 import AVFoundation
 
-struct ShareItem {
-    let url: String?
-    let mimeType: String
-    let thumbnail: String?
-    let width: Int?
-    let height: Int?
-}
-
 @objc(ShareMenuReactView)
 public class ShareMenuReactView: NSObject {
     static var viewDelegate: ReactShareViewDelegate?
@@ -107,7 +99,7 @@ public class ShareMenuReactView: NSObject {
         let item:NSExtensionItem! = context.inputItems.first as? NSExtensionItem
         let attachments:[AnyObject]! = item.attachments
 
-        var results : NSMutableArray = []//[ShareItem] = [];
+        var results : NSMutableArray = []
         
         var urlProvider:NSItemProvider! = nil
         
@@ -146,8 +138,9 @@ public class ShareMenuReactView: NSObject {
                     let url: URL! = item as? URL
                     
                     var thumbBase64: String = ""
-                    let thumbImage: UIImage? = self.thumbnailForVideo(url: url)
+                    var thumbImage: UIImage? = self.thumbnailForVideo(url: url)
                     if thumbImage != nil {
+                        thumbImage = thumbImage?.resizeImage(CGFloat.init(500.0), opaque: false)
                         let thumbImageData:NSData = thumbImage!.pngData()! as NSData
                         thumbBase64 = thumbImageData.base64EncodedString(options: .lineLength64Characters)
                     }
@@ -230,5 +223,47 @@ public class ShareMenuReactView: NSObject {
       else { return "" }
 
       return mimeUTI.takeUnretainedValue() as String
+    }
+}
+
+extension UIImage {
+    func resizeImage(_ dimension: CGFloat, opaque: Bool, contentMode: UIView.ContentMode = .scaleAspectFit) -> UIImage {
+        var width: CGFloat
+        var height: CGFloat
+        var newImage: UIImage
+
+        let size = self.size
+        let aspectRatio =  size.width/size.height
+
+        switch contentMode {
+            case .scaleAspectFit:
+                if aspectRatio > 1 {                            // Landscape image
+                    width = dimension
+                    height = dimension / aspectRatio
+                } else {                                        // Portrait image
+                    height = dimension
+                    width = dimension * aspectRatio
+                }
+
+        default:
+            fatalError("UIIMage.resizeToFit(): FATAL: Unimplemented ContentMode")
+        }
+
+        if #available(iOS 10.0, *) {
+            let renderFormat = UIGraphicsImageRendererFormat.default()
+            renderFormat.opaque = opaque
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: renderFormat)
+            newImage = renderer.image {
+                (context) in
+                self.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+            }
+        } else {
+            UIGraphicsBeginImageContextWithOptions(CGSize(width: width, height: height), opaque, 0)
+                self.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+                newImage = UIGraphicsGetImageFromCurrentImageContext()!
+            UIGraphicsEndImageContext()
+        }
+
+        return newImage
     }
 }
