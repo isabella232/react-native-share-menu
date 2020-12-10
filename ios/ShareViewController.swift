@@ -217,6 +217,15 @@ class ShareViewController: SLComposeServiceViewController {
               dict["width"] = size.width
               dict["height"] = size.height
             }
+            
+            var thumbBase64: String = ""
+            var thumbImage: UIImage? = self.thumbnailForVideo(url: url)
+            if thumbImage != nil {
+                thumbImage = thumbImage?.resizeImage(CGFloat.init(500.0), opaque: false)
+                let thumbImageData:NSData = thumbImage!.jpegData(compressionQuality: 0.8)! as NSData
+                thumbBase64 = thumbImageData.base64EncodedString(options: .lineLength64Characters)
+            }
+            dict["thumbnail"] = thumbBase64
           }
         }
         
@@ -278,7 +287,24 @@ class ShareViewController: SLComposeServiceViewController {
 //      self.openHostApp()
 //    }
   }
+  
+  func thumbnailForVideo(url: URL) -> UIImage? {
+      let asset = AVAsset(url: url)
+      let assetImageGenerator = AVAssetImageGenerator(asset: asset)
+      assetImageGenerator.appliesPreferredTrackTransform = true
 
+      var time = asset.duration
+      time.value = min(time.value, 2)
+
+      do {
+          let imageRef = try assetImageGenerator.copyCGImage(at: time, actualTime: nil)
+          return UIImage(cgImage: imageRef)
+      } catch {
+          print("failed to create thumbnail")
+          return nil
+      }
+  }
+  
   func json(from object:Any) -> String? {
       guard let data = try? JSONSerialization.data(withJSONObject: object, options: []) else {
           return nil
@@ -343,4 +369,46 @@ class ShareViewController: SLComposeServiceViewController {
     extensionContext!.cancelRequest(withError: NSError())
   }
 
+}
+
+extension UIImage {
+  func resizeImage(_ dimension: CGFloat, opaque: Bool, contentMode: UIView.ContentMode = .scaleAspectFit) -> UIImage {
+      var width: CGFloat
+      var height: CGFloat
+      var newImage: UIImage
+
+      let size = self.size
+      let aspectRatio =  size.width/size.height
+
+      switch contentMode {
+          case .scaleAspectFit:
+              if aspectRatio > 1 {                            // Landscape image
+                  width = dimension
+                  height = dimension / aspectRatio
+              } else {                                        // Portrait image
+                  height = dimension
+                  width = dimension * aspectRatio
+              }
+
+      default:
+          fatalError("UIIMage.resizeToFit(): FATAL: Unimplemented ContentMode")
+      }
+
+      if #available(iOS 10.0, *) {
+          let renderFormat = UIGraphicsImageRendererFormat.default()
+          renderFormat.opaque = opaque
+          let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: renderFormat)
+          newImage = renderer.image {
+              (context) in
+              self.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+          }
+      } else {
+          UIGraphicsBeginImageContextWithOptions(CGSize(width: width, height: height), opaque, 0)
+              self.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
+              newImage = UIGraphicsGetImageFromCurrentImageContext()!
+          UIGraphicsEndImageContext()
+      }
+
+      return newImage
+  }
 }
