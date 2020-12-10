@@ -141,7 +141,7 @@ public class ShareMenuReactView: NSObject {
                     var thumbImage: UIImage? = self.thumbnailForVideo(url: url)
                     if thumbImage != nil {
                         thumbImage = thumbImage?.resizeImage(CGFloat.init(500.0), opaque: false)
-                        let thumbImageData:NSData = thumbImage!.pngData()! as NSData
+                        let thumbImageData:NSData = thumbImage!.jpegData(compressionQuality: 0.8)! as NSData
                         thumbBase64 = thumbImageData.base64EncodedString(options: .lineLength64Characters)
                     }
                     
