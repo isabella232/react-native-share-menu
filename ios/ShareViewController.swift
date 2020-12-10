@@ -16,8 +16,6 @@ import AVFoundation
 class ShareViewController: SLComposeServiceViewController {
   var hostAppId: String?
   var hostAppUrlScheme: String?
-  var selectedImages: [UIImage] = []
-  var imagesData: [Data] = []
   
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -244,48 +242,6 @@ class ShareViewController: SLComposeServiceViewController {
     userDefaults.synchronize()
 
     self.openHostApp()
-    
-//    provider.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (data, error) in
-//      guard (error == nil) else {
-//        self.exit(withError: error.debugDescription)
-//        return
-//      }
-//      guard let url = data as? URL else {
-//        self.exit(withError: COULD_NOT_FIND_IMG_ERROR)
-//        return
-//      }
-//      guard let hostAppId = self.hostAppId else {
-//        self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
-//        return
-//      }
-//      guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
-//        self.exit(withError: NO_APP_GROUP_ERROR)
-//        return
-//      }
-//      guard let groupFileManagerContainer = FileManager.default
-//              .containerURL(forSecurityApplicationGroupIdentifier: "group.\(hostAppId)")
-//      else {
-//        self.exit(withError: NO_APP_GROUP_ERROR)
-//        return
-//      }
-//
-//      let mimeType = url.extractMimeType()
-//      let fileExtension = url.pathExtension
-//      let fileName = UUID().uuidString
-//      let filePath = groupFileManagerContainer
-//        .appendingPathComponent("\(fileName).\(fileExtension)")
-//
-//      guard self.moveFileToDisk(from: url, to: filePath) else {
-//        self.exit(withError: COULD_NOT_SAVE_FILE_ERROR)
-//        return
-//      }
-//
-//      userDefaults.set([DATA_KEY: filePath.absoluteString,  MIME_TYPE_KEY: mimeType],
-//                       forKey: USER_DEFAULTS_KEY)
-//      userDefaults.synchronize()
-//
-//      self.openHostApp()
-//    }
   }
   
   func thumbnailForVideo(url: URL) -> UIImage? {
@@ -317,13 +273,6 @@ class ShareViewController: SLComposeServiceViewController {
     do {
       if FileManager.default.fileExists(atPath: destUrl.path) {
         try FileManager.default.removeItem(at: destUrl)
-      }
-      let isExist =  FileManager.default.fileExists(atPath: srcUrl.path)
-      if isExist {
-        print("file found at path: \(srcUrl.path)")
-      }
-      else {
-        print("file NOT found at path: \(srcUrl.path)")
       }
       
       try FileManager.default.copyItem(at: srcUrl, to: destUrl)
