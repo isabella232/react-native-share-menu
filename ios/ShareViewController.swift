@@ -11,6 +11,7 @@ import MobileCoreServices
 import UIKit
 import Social
 import RNShareMenu
+import AVFoundation
 
 class ShareViewController: SLComposeServiceViewController {
   var hostAppId: String?
@@ -202,6 +203,23 @@ class ShareViewController: SLComposeServiceViewController {
         dict["url"] = filePath.absoluteString
         dict["mimeType"] = mimeType
 
+        if mimeType.starts(with: "image") {
+          if let data = try? Data(contentsOf: url) {
+              if let img = UIImage(data: data) {
+                dict["width"] = img.size.width
+                dict["height"] = img.size.height
+              }
+          }
+        }
+        else if mimeType.starts(with: "video") {
+          if let track = try? AVURLAsset(url: url).tracks(withMediaType: AVMediaType.video) {
+            if let size = try? track.first!.naturalSize {
+              dict["width"] = size.width
+              dict["height"] = size.height
+            }
+          }
+        }
+        
         results.add(dict)
 
         shareDispatchGroup.leave()
