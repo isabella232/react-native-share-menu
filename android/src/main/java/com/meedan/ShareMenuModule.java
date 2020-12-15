@@ -13,13 +13,20 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 import android.app.Activity;
+import android.app.Application;
+import android.content.ContentResolver;
 import android.content.Intent;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 public class ShareMenuModule extends ReactContextBaseJavaModule implements ActivityEventListener {
 
@@ -30,11 +37,11 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
   final String MIME_TYPE_KEY = "mimeType";
   final String DATA_KEY = "data";
 
-  private ReactContext mReactContext;
+  private final ReactApplicationContext mReactContext;
 
   public ShareMenuModule(ReactApplicationContext reactContext) {
     super(reactContext);
-    mReactContext = reactContext;
+    this.mReactContext = reactContext;
 
     mReactContext.addActivityEventListener(this);
   }
@@ -66,17 +73,79 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
       Uri fileUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
       if (fileUri != null) {
-        data.putString(DATA_KEY, fileUri.toString());
+        WritableArray dataArr = Arguments.createArray();
+        WritableMap dict = Arguments.createMap();
+
+        UUID uuid = UUID.randomUUID();
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+
+        ContentResolver cr = mReactContext.getContentResolver();
+        InputStream stream = null;
+        try {
+          stream = cr.openInputStream(fileUri);
+          BitmapFactory.decodeStream(stream, null, options);
+          int imageHeight = options.outHeight;
+          int imageWidth = options.outWidth;
+          String imageType = options.outMimeType;
+          if (stream != null) {
+            stream.close();
+          }
+
+          dict.putInt("width", imageWidth);
+          dict.putInt("height", imageHeight);
+          dict.putString("mimeType", imageType);
+
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+        dict.putString("url", fileUri.toString());
+        dict.putString("thumbnail", "");
+        dict.putString("Id", uuid.toString());
+        dataArr.pushMap(dict);
+
+        data.putArray(DATA_KEY, dataArr);
         return data;
       }
     } else if (Intent.ACTION_SEND_MULTIPLE.equals(action)) {
       ArrayList<Uri> fileUris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
       if (fileUris != null) {
-        WritableArray uriArr = Arguments.createArray();
+
+        WritableArray dataArr = Arguments.createArray();
         for (Uri uri : fileUris) {
-          uriArr.pushString(uri.toString());
+          WritableMap dict = Arguments.createMap();
+
+          UUID uuid = UUID.randomUUID();
+
+          BitmapFactory.Options options = new BitmapFactory.Options();
+          options.inJustDecodeBounds = true;
+
+          ContentResolver cr = mReactContext.getContentResolver();
+          InputStream stream = null;
+          try {
+            stream = cr.openInputStream(uri);
+            BitmapFactory.decodeStream(stream, null, options);
+            int imageHeight = options.outHeight;
+            int imageWidth = options.outWidth;
+            String imageType = options.outMimeType;
+            if (stream != null) {
+              stream.close();
+            }
+
+            dict.putInt("width", imageWidth);
+            dict.putInt("height", imageHeight);
+            dict.putString("mimeType", imageType);
+
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+          dict.putString("url", uri.toString());
+          dict.putString("thumbnail", "");
+          dict.putString("Id", uuid.toString());
+          dataArr.pushMap(dict);
         }
-        data.putArray(DATA_KEY, uriArr);
+        data.putArray(DATA_KEY, dataArr);
         return data;
       }
     }
