@@ -88,6 +88,9 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
         UUID uuid = UUID.randomUUID();
 
+        //get real path
+        String realPath = GetRealPathFromURI(mReactContext, fileUri);
+
         //get mime
         ContentResolver cR = mReactContext.getContentResolver();
         String mimeType = cR.getType(fileUri);
@@ -98,8 +101,6 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
           WritableMap metaDict = GetVideoMeta(fileUri);
           dict.merge(metaDict);
 
-          //get real path
-          String realPath = GetRealPathFromURI(mReactContext, fileUri);
           //create thumbnail
           dict.putString("thumbnail", GetVideoThumbnailBase64(realPath));
         }
@@ -114,7 +115,7 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
           dict.putString("thumbnail", "");
         }
 
-        dict.putString("url", fileUri.toString());
+        dict.putString("url", "file://".concat(realPath.replace("file://","")));
         dict.putString("Id", uuid.toString());
         dataArr.pushMap(dict);
 
@@ -131,6 +132,9 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
           UUID uuid = UUID.randomUUID();
 
+          //get real path
+          String realPath = GetRealPathFromURI(mReactContext, uri);
+
           //get mime
           ContentResolver cR = mReactContext.getContentResolver();
           String mimeType = cR.getType(uri);
@@ -141,8 +145,6 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
             WritableMap metaDict = GetVideoMeta(uri);
             dict.merge(metaDict);
 
-            //get real path
-            String realPath = GetRealPathFromURI(mReactContext, uri);
             //create thumbnail
             dict.putString("thumbnail", GetVideoThumbnailBase64(realPath));
           }
@@ -157,7 +159,7 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
             dict.putString("thumbnail", "");
           }
 
-          dict.putString("url", uri.toString());
+          dict.putString("url", "file://".concat(realPath.replace("file://","")));
           dict.putString("Id", uuid.toString());
           dataArr.pushMap(dict);
         }
@@ -246,9 +248,9 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
   public String GetRealPathFromURI(Context context, Uri contentUri) {
     Cursor cursor = null;
     try {
-      String[] proj = { MediaStore.Images.Media.DATA };
+      String[] proj = { MediaStore.MediaColumns.DATA };
       cursor = context.getContentResolver().query(contentUri,  proj, null, null, null);
-      int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+      int column_index = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA);
       cursor.moveToFirst();
       return cursor.getString(column_index);
     } finally {
