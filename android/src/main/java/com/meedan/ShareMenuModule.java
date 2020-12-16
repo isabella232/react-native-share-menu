@@ -15,14 +15,24 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import android.app.Activity;
 import android.app.Application;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.MediaMetadataRetriever;
+import android.media.ThumbnailUtils;
 import android.net.Uri;
+import android.provider.MediaStore;
+import android.util.Base64;
+import android.webkit.MimeTypeMap;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -78,30 +88,33 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
         UUID uuid = UUID.randomUUID();
 
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inJustDecodeBounds = true;
+        //get mime
+        ContentResolver cR = mReactContext.getContentResolver();
+        String mimeType = cR.getType(fileUri);
+        dict.putString("mimeType", mimeType);
 
-        ContentResolver cr = mReactContext.getContentResolver();
-        InputStream stream = null;
-        try {
-          stream = cr.openInputStream(fileUri);
-          BitmapFactory.decodeStream(stream, null, options);
+        if(mimeType.contains("video")) {
+          //get video data
+          WritableMap metaDict = GetVideoMeta(fileUri);
+          dict.merge(metaDict);
+
+          //get real path
+          String realPath = GetRealPathFromURI(mReactContext, fileUri);
+          //create thumbnail
+          dict.putString("thumbnail", GetVideoThumbnailBase64(realPath));
+        }
+        else {
+          //get image meta
+          BitmapFactory.Options options = GetImageMeta(fileUri);
           int imageHeight = options.outHeight;
           int imageWidth = options.outWidth;
-          String imageType = options.outMimeType;
-          if (stream != null) {
-            stream.close();
-          }
 
           dict.putInt("width", imageWidth);
           dict.putInt("height", imageHeight);
-          dict.putString("mimeType", imageType);
-
-        } catch (Exception e) {
-          e.printStackTrace();
+          dict.putString("thumbnail", "");
         }
+
         dict.putString("url", fileUri.toString());
-        dict.putString("thumbnail", "");
         dict.putString("Id", uuid.toString());
         dataArr.pushMap(dict);
 
@@ -118,30 +131,33 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
           UUID uuid = UUID.randomUUID();
 
-          BitmapFactory.Options options = new BitmapFactory.Options();
-          options.inJustDecodeBounds = true;
+          //get mime
+          ContentResolver cR = mReactContext.getContentResolver();
+          String mimeType = cR.getType(uri);
+          dict.putString("mimeType", mimeType);
 
-          ContentResolver cr = mReactContext.getContentResolver();
-          InputStream stream = null;
-          try {
-            stream = cr.openInputStream(uri);
-            BitmapFactory.decodeStream(stream, null, options);
+          if(mimeType.contains("video")) {
+            //get video data
+            WritableMap metaDict = GetVideoMeta(uri);
+            dict.merge(metaDict);
+
+            //get real path
+            String realPath = GetRealPathFromURI(mReactContext, uri);
+            //create thumbnail
+            dict.putString("thumbnail", GetVideoThumbnailBase64(realPath));
+          }
+          else {
+            //get image meta
+            BitmapFactory.Options options = GetImageMeta(uri);
             int imageHeight = options.outHeight;
             int imageWidth = options.outWidth;
-            String imageType = options.outMimeType;
-            if (stream != null) {
-              stream.close();
-            }
 
             dict.putInt("width", imageWidth);
             dict.putInt("height", imageHeight);
-            dict.putString("mimeType", imageType);
-
-          } catch (Exception e) {
-            e.printStackTrace();
+            dict.putString("thumbnail", "");
           }
+
           dict.putString("url", uri.toString());
-          dict.putString("thumbnail", "");
           dict.putString("Id", uuid.toString());
           dataArr.pushMap(dict);
         }
@@ -167,6 +183,79 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
     ReadableMap shared = extractShared(intent);
     successCallback.invoke(shared);
     clearSharedText();
+  }
+
+  private String GetVideoThumbnailBase64(String uri) {
+    String output = "";
+
+    try {
+      Bitmap thumbnail = ThumbnailUtils.createVideoThumbnail(uri.toString(), MediaStore.Video.Thumbnails.MINI_KIND);
+      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      thumbnail.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
+      byte[] byteArray = byteArrayOutputStream.toByteArray();
+
+      output = Base64.encodeToString(byteArray, Base64.DEFAULT);
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    return output;
+  }
+
+  private WritableMap GetVideoMeta(Uri uri) {
+
+    WritableMap dict = Arguments.createMap();
+
+    try {
+      MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+      retriever.setDataSource(mReactContext, uri);
+      int videoWidth = Integer.valueOf(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+      int videoHeight = Integer.valueOf(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+      String videoType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE);
+      dict.putInt("width", videoWidth);
+      dict.putInt("height", videoHeight);
+      retriever.release();
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    return dict;
+  }
+
+  private BitmapFactory.Options GetImageMeta(Uri uri) {
+    BitmapFactory.Options options = new BitmapFactory.Options();
+    options.inJustDecodeBounds = true;
+
+    ContentResolver cr = mReactContext.getContentResolver();
+    InputStream stream = null;
+    try {
+      stream = cr.openInputStream(uri);
+      BitmapFactory.decodeStream(stream, null, options);
+      if (stream != null) {
+        stream.close();
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    return options;
+  }
+
+  public String GetRealPathFromURI(Context context, Uri contentUri) {
+    Cursor cursor = null;
+    try {
+      String[] proj = { MediaStore.Images.Media.DATA };
+      cursor = context.getContentResolver().query(contentUri,  proj, null, null, null);
+      int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+      cursor.moveToFirst();
+      return cursor.getString(column_index);
+    } finally {
+      if (cursor != null) {
+        cursor.close();
+      }
+    }
   }
 
   private void dispatchEvent(ReadableMap shared) {
