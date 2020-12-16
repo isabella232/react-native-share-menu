@@ -115,7 +115,8 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
           dict.putString("thumbnail", "");
         }
 
-        dict.putString("url", "file://".concat(realPath.replace("file://","")));
+        dict.putString("url", "file://".concat(realPath));
+        dict.putString("preview_url", fileUri.toString());
         dict.putString("Id", uuid.toString());
         dataArr.pushMap(dict);
 
@@ -159,7 +160,8 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
             dict.putString("thumbnail", "");
           }
 
-          dict.putString("url", "file://".concat(realPath.replace("file://","")));
+          dict.putString("url", "file://".concat(realPath));
+          dict.putString("preview_url", uri.toString());
           dict.putString("Id", uuid.toString());
           dataArr.pushMap(dict);
         }
@@ -181,7 +183,6 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
     }
 
     Intent intent = currentActivity.getIntent();
-
     ReadableMap shared = extractShared(intent);
     successCallback.invoke(shared);
     clearSharedText();
