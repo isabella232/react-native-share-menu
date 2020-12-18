@@ -90,6 +90,9 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
         //get real path
         String realPath = GetRealPathFromURI(mReactContext, fileUri);
+        if(realPath == null) {
+          realPath = fileUri.toString();
+        }
 
         //get mime
         ContentResolver cR = mReactContext.getContentResolver();
@@ -135,6 +138,9 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
 
           //get real path
           String realPath = GetRealPathFromURI(mReactContext, uri);
+          if(realPath == null) {
+            realPath = uri.toString();
+          }
 
           //get mime
           ContentResolver cR = mReactContext.getContentResolver();
