@@ -93,6 +93,9 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
         if(realPath == null) {
           realPath = fileUri.toString();
         }
+        else {
+          realPath = "file://".concat(realPath);
+        }
 
         //get mime
         ContentResolver cR = mReactContext.getContentResolver();
@@ -118,7 +121,7 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
           dict.putString("thumbnail", "");
         }
 
-        dict.putString("url", "file://".concat(realPath));
+        dict.putString("url", realPath);
         dict.putString("preview_url", fileUri.toString());
         dict.putString("Id", uuid.toString());
         dataArr.pushMap(dict);
@@ -140,6 +143,9 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
           String realPath = GetRealPathFromURI(mReactContext, uri);
           if(realPath == null) {
             realPath = uri.toString();
+          }
+          else {
+            realPath = "file://".concat(realPath);
           }
 
           //get mime
@@ -166,7 +172,7 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
             dict.putString("thumbnail", "");
           }
 
-          dict.putString("url", "file://".concat(realPath));
+          dict.putString("url", realPath);
           dict.putString("preview_url", uri.toString());
           dict.putString("Id", uuid.toString());
           dataArr.pushMap(dict);
