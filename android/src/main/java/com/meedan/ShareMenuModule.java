@@ -23,7 +23,9 @@ import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
 import android.media.ThumbnailUtils;
 import android.net.Uri;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.webkit.MimeTypeMap;
 
@@ -31,6 +33,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -274,16 +279,58 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
   public String GetRealPathFromURI(Context context, Uri contentUri) {
     Cursor cursor = null;
     try {
-      String[] proj = { MediaStore.MediaColumns.DATA };
+      String[] proj = { MediaStore.MediaColumns.DATA, OpenableColumns.DISPLAY_NAME };
       cursor = context.getContentResolver().query(contentUri,  proj, null, null, null);
       int column_index = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA);
+      int column_index2 = cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME);
       cursor.moveToFirst();
-      return cursor.getString(column_index);
+
+      String realPath = cursor.getString(column_index);
+      if(realPath == null) {
+        String fileName = cursor.getString(column_index2);
+        realPath = copyContentFile(context, contentUri, fileName);
+      }
+      return realPath;
     } finally {
       if (cursor != null) {
         cursor.close();
       }
     }
+  }
+
+  private String copyContentFile(Context context, Uri sourceContentUri, String fileName) {
+    File dir = context.getCacheDir();
+
+    InputStream in = null;
+    FileOutputStream out = null;
+
+    try {
+      if(fileName == null || fileName.isEmpty()) {
+        throw new Exception("No file name");
+      }
+
+      File destFile = new File(dir, fileName);
+
+      in = context.getContentResolver().openInputStream(sourceContentUri);
+      if(in != null) {
+        out = new FileOutputStream(destFile);
+        byte[] buffer = new byte[1024];
+        while (in.read(buffer) > 0) {
+          out.write(buffer);
+        }
+        out.close();
+        in.close();
+        return destFile.getAbsolutePath();
+      }
+      else {
+        throw new NullPointerException("Invalid input stream");
+      }
+    }
+    catch (Exception e) {
+
+    }
+
+    return null;
   }
 
   private void dispatchEvent(ReadableMap shared) {
