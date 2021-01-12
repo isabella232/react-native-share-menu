@@ -202,12 +202,26 @@ class ShareViewController: SLComposeServiceViewController {
         dict["mimeType"] = mimeType
 
         if mimeType.starts(with: "image") {
-          if let data = try? Data(contentsOf: url) {
-              if let img = UIImage(data: data) {
-                dict["width"] = img.size.width
-                dict["height"] = img.size.height
-              }
-          }
+          guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil)
+                  , let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [AnyHashable: Any]
+                  , let pixelWidth = imageProperties[kCGImagePropertyPixelWidth as String]
+                  , let pixelHeight = imageProperties[kCGImagePropertyPixelHeight as String]
+                  , let orientationNumber = imageProperties[kCGImagePropertyOrientation as String]
+                  else {
+                    self.exit(withError: "Image Property Error")
+                    return
+                  }
+          var width: CGFloat = 0, height: CGFloat = 0, orientation: Int = 0
+
+          CFNumberGetValue(pixelWidth as! CFNumber, .cgFloatType, &width)
+          CFNumberGetValue(pixelHeight as! CFNumber, .cgFloatType, &height)
+          CFNumberGetValue(orientationNumber as! CFNumber, .intType, &orientation)
+
+          // Check orientation and flip size if required
+          if orientation > 4 { let temp = width; width = height; height = temp }
+      
+          dict["width"] = width
+          dict["height"] = height
         }
         else if mimeType.starts(with: "video") {
           if let track = try? AVURLAsset(url: url).tracks(withMediaType: AVMediaType.video) {
