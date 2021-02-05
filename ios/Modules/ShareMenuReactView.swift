@@ -111,6 +111,19 @@ public class ShareMenuReactView: NSObject {
             
             if provider.hasItemConformingToTypeIdentifier(kUTTypeURL as String) {
                 urlProvider = provider as? NSItemProvider
+                urlProvider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (item, error) in
+                    let url: URL! = item as? URL
+                    if url.absoluteString.hasPrefix("file://") {
+                        let dict: NSMutableDictionary = [:]
+                        dict["url"] = url.absoluteString
+                        dict["mimeType"] = self.extractMimeType(from: url)
+                        dict["thumbnail"] = nil
+                        dict["Id"] = UUID().uuidString
+                        
+                        results.add(dict)
+                        self.shareDispatchGroup.leave()
+                    }
+                }
                 //break
             } else if provider.hasItemConformingToTypeIdentifier(kUTTypeText as String) {
                 textProvider = provider as? NSItemProvider

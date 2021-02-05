@@ -202,20 +202,20 @@ class ShareViewController: SLComposeServiceViewController {
         dict["mimeType"] = mimeType
 
         if mimeType.starts(with: "image") {
-          guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil)
+          guard let imageSource = CGImageSourceCreateWithURL(filePath as CFURL, nil)
                   , let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [AnyHashable: Any]
                   , let pixelWidth = imageProperties[kCGImagePropertyPixelWidth as String]
                   , let pixelHeight = imageProperties[kCGImagePropertyPixelHeight as String]
-                  , let orientationNumber = imageProperties[kCGImagePropertyOrientation as String]
                   else {
                     self.exit(withError: "Image Property Error")
                     return
                   }
           var width: CGFloat = 0, height: CGFloat = 0, orientation: Int = 0
-
+          if let orientationNumber = imageProperties[kCGImagePropertyOrientation as String] {
+            CFNumberGetValue(orientationNumber as! CFNumber, .intType, &orientation)
+          }
           CFNumberGetValue(pixelWidth as! CFNumber, .cgFloatType, &width)
           CFNumberGetValue(pixelHeight as! CFNumber, .cgFloatType, &height)
-          CFNumberGetValue(orientationNumber as! CFNumber, .intType, &orientation)
 
           // Check orientation and flip size if required
           if orientation > 4 { let temp = width; width = height; height = temp }
