@@ -281,12 +281,12 @@ public class ShareMenuModule extends ReactContextBaseJavaModule implements Activ
     try {
       String[] proj = { MediaStore.MediaColumns.DATA, OpenableColumns.DISPLAY_NAME };
       cursor = context.getContentResolver().query(contentUri,  proj, null, null, null);
-      int column_index = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA);
-      int column_index2 = cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME);
+      int column_index = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+      int column_index2 = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
       cursor.moveToFirst();
 
-      String realPath = cursor.getString(column_index);
-      if(realPath == null) {
+      String realPath = column_index != -1 ? cursor.getString(column_index) : null;
+      if(realPath == null && column_index2 != -1) {
         String fileName = cursor.getString(column_index2);
         realPath = copyContentFile(context, contentUri, fileName);
       }
