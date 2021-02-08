@@ -224,14 +224,14 @@ class ShareViewController: SLComposeServiceViewController {
           dict["height"] = height
         }
         else if mimeType.starts(with: "video") {
-          if let track = try? AVURLAsset(url: url).tracks(withMediaType: AVMediaType.video) {
+          if let track = try? AVURLAsset(url: filePath).tracks(withMediaType: AVMediaType.video) {
             if let size = try? track.first!.naturalSize {
               dict["width"] = size.width
               dict["height"] = size.height
             }
             
             var thumbBase64: String = ""
-            var thumbImage: UIImage? = self.thumbnailForVideo(url: url)
+            var thumbImage: UIImage? = self.thumbnailForVideo(url: filePath)
             if thumbImage != nil {
                 thumbImage = thumbImage?.resizeImage(CGFloat.init(500.0), opaque: false)
                 let thumbImageData:NSData = thumbImage!.jpegData(compressionQuality: 0.8)! as NSData
