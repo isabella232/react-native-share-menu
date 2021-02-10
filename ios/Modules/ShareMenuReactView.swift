@@ -111,6 +111,40 @@ public class ShareMenuReactView: NSObject {
             
             if provider.hasItemConformingToTypeIdentifier(kUTTypeURL as String) {
                 urlProvider = provider as? NSItemProvider
+                urlProvider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (item, error) in
+                    let url: URL! = item as? URL
+                    if url.absoluteString.hasPrefix("file://") {
+                        let dict: NSMutableDictionary = [:]
+                        dict["url"] = url.absoluteString
+                        let mimeType: String = self.extractMimeType(from: url);
+                        dict["mimeType"] = mimeType
+                        do {
+                            if mimeType.contains("video") {
+                                var thumbImage: UIImage? = self.thumbnailForVideo(url: url)
+                                if thumbImage != nil {
+                                    thumbImage = thumbImage?.resizeImage(CGFloat.init(500.0), opaque: false)
+                                    let thumbImageData:NSData = thumbImage!.jpegData(compressionQuality: 0.8)! as NSData
+                                    let thumbBase64 = thumbImageData.base64EncodedString(options: .lineLength64Characters)
+                                    dict["thumbnail"] = thumbBase64
+                                }
+                                else {
+                                    throw NSError()
+                                }
+                            }
+                            else {
+                                throw NSError()
+                            }
+                        }
+                        catch {
+                            //error
+                            dict["thumbnail"] = nil
+                        }
+                        dict["Id"] = UUID().uuidString
+                        
+                        results.add(dict)
+                        self.shareDispatchGroup.leave()
+                    }
+                }
                 //break
             } else if provider.hasItemConformingToTypeIdentifier(kUTTypeText as String) {
                 textProvider = provider as? NSItemProvider
